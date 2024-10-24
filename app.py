@@ -1,6 +1,7 @@
 import streamlit as st
 import plotly.graph_objects as go
-from nba_api.stats.endpoints import playergamelog, commonplayerinfo
+import plotly.express as px
+from nba_api.stats.endpoints import playergamelog, commonplayerinfo, shotchartdetail, leagueleaders
 from nba_api.stats.static import players, teams
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
@@ -88,6 +89,76 @@ def get_player_team(player_id):
     except Exception as e:
         return "Unknown Team"
 
+# Function to plot shot chart
+def plot_shot_chart(player_id, player_name, season='2023-24'):
+    try:
+        shotchart = shotchartdetail.ShotChartDetail(
+            team_id=0, 
+            player_id=player_id, 
+            season_nullable=season, 
+            season_type_all_star='Regular Season', 
+            context_measure_simple='FGA'
+        )
+        shot_df = shotchart.get_data_frames()[0]
+
+        fig = go.Figure()
+        for made in [1, 0]:
+            shot_data = shot_df[shot_df['SHOT_MADE_FLAG'] == made]
+            fig.add_trace(go.Scatter(
+                x=shot_data['LOC_X'], 
+                y=shot_data['LOC_Y'], 
+                mode='markers',
+                marker=dict(color='green' if made else 'red'),
+                name='Made' if made else 'Missed'
+            ))
+
+        fig.update_layout(
+            title=f'Shot Chart for {player_name} ({season})',
+            xaxis_title='Court Length',
+            yaxis_title='Court Width'
+        )
+        st.plotly_chart(fig)
+    except Exception as e:
+        st.write(f"Error fetching shot chart data: {e}")
+
+# Function to display a spider chart of key stats
+def plot_spider_chart(stats, player_name):
+    categories = ['Points', 'Assists', 'Rebounds', 'Steals', 'Blocks', 'Turnovers']
+    values = [
+        stats['PTS'].mean(),
+        stats['AST'].mean(),
+        stats['REB'].mean(),
+        stats['STL'].mean(),
+        stats['BLK'].mean(),
+        stats['TOV'].mean()
+    ]
+    
+    fig = go.Figure(data=go.Scatterpolar(
+        r=values + values[:1],  # Close the loop
+        theta=categories + categories[:1],
+        fill='toself',
+        name=player_name
+    ))
+    fig.update_layout(
+        title=f"Spider Chart of Key Stats for {player_name}",
+        polar=dict(radialaxis=dict(visible=True)),
+        showlegend=True
+    )
+    st.plotly_chart(fig)
+
+# Function to get top league players
+def get_top_league_players(category, season='2023-24'):
+    try:
+        leaders = leagueleaders.LeagueLeaders(
+            stat_category_abbreviation=category, 
+            season=season, 
+            season_type_all_star='Regular Season'
+        )
+        leaders_df = leaders.get_data_frames()[0].head(10)  # Top 10 players
+        return leaders_df[['PLAYER', 'TEAM', category]]
+    except Exception as e:
+        return None
+
 # Streamlit app
 def main():
     st.title("NBA Player Performance Prediction - 2023-2024 Season")
@@ -132,6 +203,14 @@ def main():
                         )
                         st.plotly_chart(fig)
 
+                        # Plot the shot chart
+                        st.write("### Shot Chart")
+                        plot_shot_chart(player_id, selected_player, season='2023-24')
+
+                        # Spider chart of key stats
+                        st.write("### Key Stats Spider Chart")
+                        plot_spider_chart(gamelog_df, selected_player)
+
                         # Additional visuals: Field Goal Percentage over time
                         st.write("### Field Goal Percentage Over Time")
                         fig_fg = go.Figure()
@@ -160,6 +239,20 @@ def main():
                         )
                         st.plotly_chart(comparison_fig)
 
+                        # Top league players in various categories
+                        st.write("### League Player Rankings")
+                        categories = {
+                            "PTS": "Points Per Game (PPG)",
+                            "AST": "Assists Per Game (APG)",
+                            "REB": "Rebounds Per Game (RPG)"
+                        }
+                        for category, label in categories.items():
+                            st.subheader(label)
+                            top_players = get_top_league_players(category)
+                            if top_players is not None:
+                                st.table(top_players)
+                            else:
+                                st.write(f"Error fetching top players for {label}")
                     else:
                         st.write("Not enough game data to train a predictive model.")
                 else:
