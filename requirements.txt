@@ -1,8 +1,7 @@
 streamlit
-nba_api
-scikit-learn
 plotly
+nba-api
+scikit-learn
 pandas
 numpy
 Pillow
-requests
