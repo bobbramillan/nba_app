@@ -1,7 +1,7 @@
 import streamlit as st
 import plotly.graph_objects as go
 from nba_api.stats.endpoints import playergamelog, commonplayerinfo
-from nba_api.stats.static import players
+from nba_api.stats.static import players, teams
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error
@@ -76,6 +76,18 @@ def display_player_headshot(player_id, player_name):
     else:
         st.write(f"Could not retrieve headshot for {player_name}.")
 
+# Function to get a player's current team
+def get_player_team(player_id):
+    try:
+        player_info = commonplayerinfo.CommonPlayerInfo(player_id=player_id).get_data_frames()[0]
+        if not player_info.empty:
+            team_id = player_info['TEAM_ID'].values[0]
+            team_name = teams.find_team_name_by_id(team_id)
+            return team_name['full_name'] if team_name else "Unknown Team"
+        return "Unknown Team"
+    except Exception as e:
+        return "Unknown Team"
+
 # Streamlit app
 def main():
     st.title("NBA Player Performance Prediction - 2023-2024 Season")
@@ -93,6 +105,10 @@ def main():
                 gamelog_df, error = get_player_stats(player_id, season='2023-24')
                 if gamelog_df is not None:
                     if len(gamelog_df) >= 10:  # Ensure enough data for training
+                        # Get the team for the 2024-2025 season
+                        team_name = get_player_team(player_id)
+                        st.write(f"**{selected_player} will be playing for {team_name} in the 2024-2025 season.**")
+
                         # Train the Random Forest model
                         model, mse = train_random_forest(gamelog_df)
                         st.write(f"Model Mean Squared Error: {mse:.2f}")
@@ -104,9 +120,46 @@ def main():
                         # Display player headshot
                         display_player_headshot(player_id, selected_player)
 
-                        # Visualization of recent game data
-                        st.write("Recent Game Performance")
-                        st.line_chart(gamelog_df[['GameNumber', 'PTS']].set_index('GameNumber'))
+                        # Visualization of recent game data with labeled axes
+                        st.write("### Recent Game Performance")
+                        fig = go.Figure()
+                        fig.add_trace(go.Scatter(x=gamelog_df['GameNumber'], y=gamelog_df['PTS'], mode='lines+markers', name='Points'))
+                        fig.update_layout(
+                            title='Recent Game Performance',
+                            xaxis_title='Game Number',
+                            yaxis_title='Points Scored',
+                            showlegend=True
+                        )
+                        st.plotly_chart(fig)
+
+                        # Additional visuals: Field Goal Percentage over time
+                        st.write("### Field Goal Percentage Over Time")
+                        fig_fg = go.Figure()
+                        gamelog_df['FG%'] = (gamelog_df['FGM'] / gamelog_df['FGA']) * 100
+                        fig_fg.add_trace(go.Scatter(x=gamelog_df['GameNumber'], y=gamelog_df['FG%'], mode='lines+markers', name='FG%'))
+                        fig_fg.update_layout(
+                            title='Field Goal Percentage Over Time',
+                            xaxis_title='Game Number',
+                            yaxis_title='Field Goal Percentage (%)',
+                            showlegend=True
+                        )
+                        st.plotly_chart(fig_fg)
+
+                        # Visualization: Comparison of Points, Assists, and Rebounds
+                        st.write("### Points, Assists, and Rebounds Comparison")
+                        comparison_fig = go.Figure()
+                        comparison_fig.add_trace(go.Bar(x=['Points', 'Assists', 'Rebounds'], y=[
+                            gamelog_df['PTS'].mean(),
+                            gamelog_df['AST'].mean(),
+                            gamelog_df['REB'].mean()
+                        ], name='Average Stats', marker_color='blue'))
+                        comparison_fig.update_layout(
+                            title='Average Points, Assists, and Rebounds',
+                            yaxis_title='Average per Game',
+                            xaxis_title='Stat Category'
+                        )
+                        st.plotly_chart(comparison_fig)
+
                     else:
                         st.write("Not enough game data to train a predictive model.")
                 else:
