@@ -19,7 +19,7 @@ def get_player_id(player_name):
 
 # Improved function to fetch player stats with consistent return
 @st.cache_data
-def get_player_stats(player_id, season='2024-25'):
+def get_player_stats(player_id, season='2023-24'):
     try:
         gamelog = playergamelog.PlayerGameLog(player_id=player_id, season=season)
         gamelog_df = gamelog.get_data_frames()[0]
@@ -78,7 +78,7 @@ def display_player_headshot(player_id, player_name):
 
 # Streamlit app
 def main():
-    st.title("NBA Player Performance Prediction - 2024-2025 Season")
+    st.title("NBA Player Performance Prediction - 2023-2024 Season")
 
     # Dropdown for player selection
     nba_players = players.get_active_players()
@@ -90,7 +90,7 @@ def main():
         if player_id:
             player_info = commonplayerinfo.CommonPlayerInfo(player_id=player_id).get_data_frames()[0]
             if not player_info.empty:
-                gamelog_df, error = get_player_stats(player_id)
+                gamelog_df, error = get_player_stats(player_id, season='2023-24')
                 if gamelog_df is not None:
                     if len(gamelog_df) >= 10:  # Ensure enough data for training
                         # Train the Random Forest model
