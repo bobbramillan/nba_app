@@ -17,7 +17,7 @@ def get_player_id(player_name):
     player_dict = {player['full_name']: player for player in nba_players}
     return player_dict.get(player_name, {}).get('id')
 
-# Function to fetch player stats
+# Improved function to fetch player stats with consistent return
 @st.cache_data
 def get_player_stats(player_id, season='2024-25'):
     try:
@@ -25,9 +25,9 @@ def get_player_stats(player_id, season='2024-25'):
         gamelog_df = gamelog.get_data_frames()[0]
         if gamelog_df.empty:
             return None, "No games played in the selected season."
-        return gamelog_df
+        return gamelog_df, None  # Return DataFrame and None for error
     except Exception as e:
-        return None, str(e)
+        return None, str(e)  # Return None and the error message if an exception occurs
 
 # Function to train a Random Forest model
 def train_random_forest(data):
